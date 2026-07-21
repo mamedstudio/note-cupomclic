@@ -28,45 +28,49 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
   "live": "Roteiro dinâmico de 30 segundos em 1ª pessoa para a Influencer falar ao vivo na Live Commerce com muita energia"
 }`;
 
-    // Lista de modelos atualizados do Gemini para garantir compatibilidade 100%
-    const endpoints = [
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`
-    ];
+    // Lista de modelos atualizados do Gemini (versões 2.5 e 2.0)
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    let responseData = null;
+    let lastError = '';
 
-    let response = null;
-    let lastErrorText = '';
-
-    // Testa os endpoints até encontrar o modelo ativo no projeto do Google
-    for (const url of endpoints) {
+    for (const model of models) {
       try {
-        response = await fetch(url, {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        
+        const resApi = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: { response_mime_type: "application/json" }
+            generationConfig: { 
+              responseMimeType: "application/json" 
+            }
           })
         });
 
-        if (response.ok) {
-          break; // Conexão bem-sucedida!
+        if (resApi.ok) {
+          responseData = await resApi.json();
+          break; // Conexão realizada com sucesso!
         } else {
-          lastErrorText = await response.text();
+          const errBody = await resApi.text();
+          lastError = `[Model ${model}]: ${errBody}`;
         }
-      } catch (e) {
-        lastErrorText = e.message;
+      } catch (err) {
+        lastError = `[Model ${model}]: ${err.message}`;
       }
     }
 
-    if (!response || !response.ok) {
-      return res.status(500).json({ erro: `Erro no Gemini: ${lastErrorText}` });
+    if (!responseData) {
+      return res.status(500).json({ erro: `Falha ao conectar com o Gemini. Detalhes: ${lastError}` });
     }
 
-    const data = await response.json();
-    const jsonResult = JSON.parse(data.candidates[0].content.parts[0].text);
+    // Extrai o texto retornado
+    let rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Sanitiza o texto removendo marcadores de código caso o Gemini devolva ```json
+    rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    const jsonResult = JSON.parse(rawText);
 
     return res.status(200).json({
       sucesso: true,
@@ -75,6 +79,6 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
 
   } catch (erro) {
     console.error("Erro interno:", erro);
-    return res.status(500).json({ erro: 'Erro ao processar a geração no servidor.' });
+    return res.status(500).json({ erro: `Erro ao processar a geração no servidor: ${erro.message}` });
   }
 }
