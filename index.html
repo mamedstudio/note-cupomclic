@@ -176,7 +176,7 @@
       texto = texto.trim();
 
       if (!texto) {
-        return alert('Gere as notas de venda primeiro antes de criar o áudio!');
+        return alert('Gere as notas de venda primeiro!');
       }
 
       const btn = document.getElementById('btn-audio');
@@ -184,7 +184,7 @@
       const player = document.getElementById('audio-player');
       const downloadBtn = document.getElementById('btn-download');
 
-      btn.innerText = '⏳ Gravando locução (isso leva uns 10s)...';
+      btn.innerText = '⏳ Gravando locução (aguarde uns 10s)...';
       btn.disabled = true;
 
       try {
@@ -200,7 +200,8 @@
         try {
           data = JSON.parse(textResponse);
         } catch (e) {
-          alert('Erro no formato da resposta do servidor de áudio.');
+          // Se o servidor responder algo diferente de JSON (ex: erro Vercel 500), mostra o texto exato
+          alert(`Erro do servidor (${res.status}): ${textResponse.substring(0, 180)}`);
           btn.innerText = '🎙️ Tentar Novamente';
           btn.disabled = false;
           return;
@@ -212,12 +213,11 @@
           btn.style.display = 'none';
           audioBox.style.display = 'block';
         } else {
-          alert(data.erro || 'Erro desconhecido ao gerar áudio.');
+          alert(data.erro || 'Erro ao gerar áudio.');
           btn.innerText = '🎙️ Tentar Novamente';
         }
       } catch (err) {
-        alert('Erro de conexão ao gerar áudio. Verifique sua internet.');
-        console.error("Erro Fetch:", err);
+        alert('Erro de conexão ao gerar áudio.');
         btn.innerText = '🎙️ Tentar Novamente';
       } finally {
         btn.disabled = false;
