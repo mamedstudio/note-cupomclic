@@ -11,35 +11,39 @@ export default async function handler(req, res) {
       return res.status(500).json({ erro: 'A chave GROQ_API_KEY não foi configurada na Vercel.' });
     }
 
-    apiKey = apiKey.trim();
-
     if (!produto || !oferta) {
       return res.status(400).json({ erro: 'Informe o produto e a oferta.' });
     }
 
-    const promptText = `Atue como o "Note CupomClic", o gerador de textos de vendas de alta conversão do ecossistema Tokto-CupomClic.
-    
+    const promptText = `Atue como o "Note CupomClic", gerador de notas de vendas persuasivas do ecossistema Tokto-CupomClic.
+
 Produto: ${produto}
 Oferta/Preço: ${oferta}
 Tom de Voz/Estilo: ${estilo || 'Botini Agressivo (Vendas e Urgência)'}
 
-Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON válido com as seguintes chaves e formatos exatos:
+REGRAS DE OURO:
+1. Idioma: Use ESTRITAMENTE Português do Brasil (PT-BR) natural. NUNCA utilize termos, gírias ou expressões em inglês (ex: use "água na boca" em vez de "mouth water").
+2. No campo "live" (que será lido por um locutor de áudio):
+   - Escreva os valores sempre por extenso ou de forma limpa para leitura (ex: "vinte reais" em vez de "R$ 20" ou "R$20,00").
+   - Mantenha a concordância perfeita para locução humanizada de rádio/TV (ex: "uma pizza", "dois hambúrgueres").
+
+Retorne ESTRITAMENTE um objeto JSON válido com as seguintes chaves:
 {
-  "instagram": "Legenda para Instagram com emojis, oferta clara, gatilho de escassez e hashtags locais da cidade",
-  "whatsapp": "Texto formatado para disparo de WhatsApp usando *negrito* nos destaques, direto e fácil de ler",
-  "live": "Roteiro dinâmico de 30 segundos em 1ª pessoa para a Influencer falar ao vivo na Live Commerce com muita energia"
+  "instagram": "Legenda para Instagram com emojis, oferta e hashtags",
+  "whatsapp": "Texto formatado para disparo de WhatsApp com *negrito*",
+  "live": "Roteiro fluído e pronto para locução de rádio/live commerce, sem símbolos monetários como R$, apenas por extenso"
 }`;
 
     const resApi = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey.trim()}`
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: 'Você é um assistente de copywriting persuasivo que responde estritamente em formato JSON.' },
+          { role: 'system', content: 'Você é um assistente de copywriting em Português do Brasil que responde estritamente em formato JSON.' },
           { role: 'user', content: promptText }
         ],
         response_format: { type: 'json_object' }
