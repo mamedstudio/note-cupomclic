@@ -297,7 +297,7 @@
       btn.innerText = '⏳ Gerando Textos de Alta Conversão...';
       btn.disabled = true;
 
-      // Reseta estado do player de áudio
+      // Reseta o estado do player de áudio
       document.getElementById('audio-box').style.display = 'none';
       document.getElementById('btn-audio').style.display = 'block';
       document.getElementById('btn-audio').innerText = '🎙️ Gerar Locução em MP3 (IA)';
@@ -341,16 +341,24 @@
 
     async function gerarAudio() {
       const liveElem = document.getElementById('nota-live');
-      // .textContent garante leitura limpa mesmo se o elemento estiver oculto
-      const texto = liveElem ? liveElem.textContent.trim() : '';
+      const waElem = document.getElementById('nota-whatsapp');
+      const instaElem = document.getElementById('nota-instagram');
+
+      // Pega o roteiro de live; se estiver vazio, usa WhatsApp ou Instagram como alternativa
+      let texto = (liveElem ? liveElem.textContent : '') || 
+                  (waElem ? waElem.textContent : '') || 
+                  (instaElem ? instaElem.textContent : '');
+
+      texto = texto.trim();
+
+      if (!texto) {
+        return alert('Gere as notas de venda primeiro antes de criar o áudio!');
+      }
+
       const btn = document.getElementById('btn-audio');
       const audioBox = document.getElementById('audio-box');
       const player = document.getElementById('audio-player');
       const downloadBtn = document.getElementById('btn-download');
-
-      if (!texto) {
-        return alert('Por favor, aguarde o texto ser gerado antes de criar o áudio!');
-      }
 
       btn.innerText = '⏳ Gravando locução em MP3 via Fal.ai...';
       btn.disabled = true;
