@@ -296,9 +296,8 @@
 
       btn.innerText = '⏳ Gerando Textos de Alta Conversão...';
       btn.disabled = true;
-      results.style.display = 'none';
 
-      // Reseta estado do player de áudio para uma nova geração
+      // Reseta estado do player de áudio
       document.getElementById('audio-box').style.display = 'none';
       document.getElementById('btn-audio').style.display = 'block';
       document.getElementById('btn-audio').innerText = '🎙️ Gerar Locução em MP3 (IA)';
@@ -313,9 +312,9 @@
         const data = await res.json();
 
         if (data.sucesso && data.notas) {
-          document.getElementById('nota-instagram').innerText = data.notas.instagram || '';
-          document.getElementById('nota-whatsapp').innerText = data.notas.whatsapp || '';
-          document.getElementById('nota-live').innerText = data.notas.live || '';
+          document.getElementById('nota-instagram').textContent = data.notas.instagram || '';
+          document.getElementById('nota-whatsapp').textContent = data.notas.whatsapp || '';
+          document.getElementById('nota-live').textContent = data.notas.live || '';
           results.style.display = 'block';
         } else {
           alert(data.erro || 'Erro ao gerar textos.');
@@ -329,7 +328,8 @@
     }
 
     function copiarTexto(id, btnElement) {
-      const text = document.getElementById(id).innerText;
+      const elem = document.getElementById(id);
+      const text = elem ? elem.textContent : '';
       if (!text) return;
 
       navigator.clipboard.writeText(text).then(() => {
@@ -341,14 +341,15 @@
 
     async function gerarAudio() {
       const liveElem = document.getElementById('nota-live');
-      const texto = liveElem ? liveElem.innerText.trim() : '';
+      // .textContent garante leitura limpa mesmo se o elemento estiver oculto
+      const texto = liveElem ? liveElem.textContent.trim() : '';
       const btn = document.getElementById('btn-audio');
       const audioBox = document.getElementById('audio-box');
       const player = document.getElementById('audio-player');
       const downloadBtn = document.getElementById('btn-download');
 
       if (!texto) {
-        return alert('Por favor, clique primeiro em "⚡ Gerar Notas de Venda"!');
+        return alert('Por favor, aguarde o texto ser gerado antes de criar o áudio!');
       }
 
       btn.innerText = '⏳ Gravando locução em MP3 via Fal.ai...';
