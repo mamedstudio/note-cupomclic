@@ -4,27 +4,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { texto } = req.body;
+    // Garante a leitura correta do corpo da requisição
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const texto = body?.texto || body?.text;
     let apiKey = process.env.FAL_KEY;
 
     if (!apiKey) {
       return res.status(500).json({ erro: 'A chave FAL_KEY não foi configurada na Vercel.' });
     }
 
-    if (!texto) {
-      return res.status(400).json({ erro: 'Informe o texto para geração do áudio.' });
+    if (!texto || !texto.trim()) {
+      return res.status(400).json({ erro: 'Gere as notas de venda antes de criar o áudio.' });
     }
 
-    // Chamada para a API do ElevenLabs (v3 Multilíngue) hospedada no Fal.ai
-    const response = await fetch('https://fal.run/fal-ai/elevenlabs/tts/eleven-v3', {
+    // Chamada para a API Kokoro TTS hospedada no Fal.ai (Super rápida e excelente qualidade)
+    const response = await fetch('https://fal.run/fal-ai/kokoro', {
       method: 'POST',
       headers: {
-        'Authorization': `Key ${apiKey.trim()}`, // O Fal.ai exige o prefixo "Key "
+        'Authorization': `Key ${apiKey.trim()}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        text: texto,
-        voice: "Charlie" // Charlie tem um tom muito bom e natural para vendas (PT-BR)
+        prompt: texto.trim()
       })
     });
 
@@ -35,9 +36,8 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // O Fal retorna um objeto que contém a URL do áudio pronto (data.audio.url)
     if (!data.audio || !data.audio.url) {
-      return res.status(500).json({ erro: 'O Fal não retornou o link do áudio.' });
+      return res.status(500).json({ erro: 'O Fal.ai não retornou o link do áudio.' });
     }
 
     return res.status(200).json({
