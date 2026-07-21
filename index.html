@@ -1,190 +1,61 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Note CupomClic - Bloco de Notas de Vendas</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, sans-serif; }
-        body { background-color: #0b192c; color: #ffffff; padding: 20px; display: flex; justify-content: center; min-height: 100vh; }
-        
-        .container { width: 100%; max-width: 650px; background: #1a2a40; padding: 30px; border-radius: 16px; border: 1px solid #d48a5c; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5); align-self: center; text-align: center; }
-        
-        .logo { font-size: 22px; font-weight: 800; color: #d48a5c; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
-        .tagline { color: #8fa0b5; font-size: 13px; margin-bottom: 25px; }
-        
-        .campo { margin-bottom: 18px; text-align: left; }
-        label { color: #3b9b9b; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px; }
-        input, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #3b9b9b; background: #0b192c; color: #ffffff; font-size: 14px; }
-        input:focus, select:focus { outline: none; border-color: #d48a5c; }
-        
-        button.btn-main { background: linear-gradient(135deg, #d48a5c 0%, #b37143 100%); color: #ffffff; border: none; padding: 14px; width: 100%; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; transition: 0.2s; }
-        button.btn-main:hover { opacity: 0.9; transform: translateY(-1px); }
-        button.btn-main:disabled { background: #555; cursor: not-allowed; opacity: 0.6; transform: none; }
+<!-- CÓDIGO DO BOTÃO E PLAYER DE ÁUDIO -->
+<div class="audio-box" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+  <button id="btn-audio" onclick="gerarAudio()" class="btn-secundario" style="background: #2b3a4a; color: #fff; padding: 10px 20px; border-radius: 8px; border: 1px solid #4a5d73; cursor: pointer; font-weight: bold; width: 100%;">
+    🎙️ Gerar Locução em MP3 (ElevenLabs)
+  </button>
+  
+  <div id="audio-player-container" style="display: none; margin-top: 15px; text-align: center;">
+    <audio id="audio-player" controls style="width: 100%; outline: none; margin-bottom: 15px;"></audio>
+    <a id="download-audio-link" download="locucao-cupomclic.mp3" style="display: inline-block; background: #e69c5e; color: #1a2530; padding: 10px 25px; border-radius: 6px; font-weight: bold; text-decoration: none;">
+      ⬇️ Baixar Arquivo MP3
+    </a>
+  </div>
+</div>
 
-        /* LOADING (ROLETA + MENSAGEM) */
-        .loading-box {
-            margin-top: 25px;
-            padding: 20px;
-            background: #0b192c;
-            border: 1px solid #d48a5c;
-            border-radius: 12px;
-        }
+<script>
+// FUNÇÃO PARA CHAMAR O BACKEND E BAIXAR O ÁUDIO
+async function gerarAudio() {
+  const notaElement = document.getElementById('nota-live');
+  const textoLive = notaElement ? notaElement.innerText : '';
+  const btn = document.getElementById('btn-audio');
+  const container = document.getElementById('audio-player-container');
+  const player = document.getElementById('audio-player');
+  const downloadLink = document.getElementById('download-audio-link');
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(212, 138, 92, 0.2);
-            border-top-color: #d48a5c;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 12px auto;
-        }
+  if (!textoLive || textoLive.trim() === '') {
+    return alert('Por favor, gere as notas de venda primeiro!');
+  }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+  btn.innerText = '⏳ Gravando Locução (isso pode levar 5 a 10s)...';
+  btn.disabled = true;
+  btn.style.opacity = '0.7';
 
-        .loading-text {
-            color: #d48a5c;
-            font-weight: 700;
-            font-size: 14px;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
+  try {
+    const res = await fetch('/api/generate-audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texto: textoLive })
+    });
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+    const data = await res.json();
 
-        /* CARDS DAS NOTAS */
-        .note-card { background: #0b192c; border: 1px solid rgba(59, 155, 155, 0.4); border-radius: 10px; padding: 18px; margin-top: 20px; text-align: left; }
-        .note-card h3 { color: #3b9b9b; font-size: 13px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .note-content { font-size: 13.5px; color: #e2e8f0; white-space: pre-wrap; line-height: 1.5; }
-        
-        .btn-copy { background: #3b9b9b; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: bold; }
-        .btn-copy:hover { background: #2a7a7a; }
-        
-        .hidden { display: none !important; }
-    </style>
-</head>
-<body>
-
-    <div class="container">
-        <div class="logo">📝 Note CupomClic</div>
-        <div class="tagline">Gerador Inteligente de Notas e Copys de Vendas</div>
-
-        <div class="campo">
-            <label>1. Nome do Produto ou Serviço:</label>
-            <input type="text" id="produtoInput" placeholder="Ex: Pizza Grande de Calabresa com Borda">
-        </div>
-
-        <div class="campo">
-            <label>2. Preço ou Condição da Oferta:</label>
-            <input type="text" id="ofertaInput" placeholder="Ex: De R$ 55 por R$ 34,90 no CupomClic">
-        </div>
-
-        <div class="campo">
-            <label>3. Estilo / Tom do Texto:</label>
-            <select id="estiloSelect">
-                <option value="Botini Agressivo (Vendas e Urgência)">🔥 Botini Agressivo (Venda Rápida & Urgência)</option>
-                <option value="Gourmet / Premium Elegante">✨ Gourmet / Premium Elegante</option>
-                <option value="Direto e Amigável">💬 Direto e Amigável para WhatsApp</option>
-            </select>
-        </div>
-
-        <button class="btn-main" id="btnGerar" onclick="gerarNotas()">⚡ Gerar Notas de Venda</button>
-
-        <!-- CAIXA DE LOADING -->
-        <div id="loadingBox" class="loading-box hidden">
-            <div class="spinner"></div>
-            <div class="loading-text">Aguarde, o Note CupomClic está criando suas notas de alta conversão...</div>
-        </div>
-
-        <!-- BLOCO DE RESULTADOS -->
-        <div id="blocoNotas" class="hidden">
-            
-            <div class="note-card">
-                <h3>
-                    <span>📸 Nota para Instagram</span>
-                    <button class="btn-copy" onclick="copiar('noteInsta')">Copiar Nota</button>
-                </h3>
-                <div id="noteInsta" class="note-content"></div>
-            </div>
-
-            <div class="note-card">
-                <h3>
-                    <span>💬 Nota para WhatsApp</span>
-                    <button class="btn-copy" onclick="copiar('noteWhats')">Copiar Nota</button>
-                </h3>
-                <div id="noteWhats" class="note-content"></div>
-            </div>
-
-            <div class="note-card">
-                <h3>
-                    <span>🎙️ Roteiro da Influencer (Live 30s)</span>
-                    <button class="btn-copy" onclick="copiar('noteLive')">Copiar Nota</button>
-                </h3>
-                <div id="noteLive" class="note-content"></div>
-            </div>
-
-        </div>
-    </div>
-
-    <script>
-        async function gerarNotas() {
-            const produto = document.getElementById('produtoInput').value;
-            const oferta = document.getElementById('ofertaInput').value;
-            const estilo = document.getElementById('estiloSelect').value;
-            const btnGerar = document.getElementById('btnGerar');
-            const loadingBox = document.getElementById('loadingBox');
-            const blocoNotas = document.getElementById('blocoNotas');
-
-            if (!produto || !oferta) {
-                alert("Por favor, preencha o produto e a oferta!");
-                return;
-            }
-
-            // Ativa o estado de carregamento
-            btnGerar.disabled = true;
-            btnGerar.innerText = "⏳ Escrevendo...";
-            loadingBox.classList.remove('hidden');
-            blocoNotas.classList.add('hidden');
-
-            try {
-                const response = await fetch('/api/generate-note', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ produto, oferta, estilo })
-                });
-
-                const data = await response.json();
-
-                if (data.sucesso) {
-                    document.getElementById('noteInsta').innerText = data.notas.instagram;
-                    document.getElementById('noteWhats').innerText = data.notas.whatsapp;
-                    document.getElementById('noteLive').innerText = data.notas.live;
-
-                    blocoNotas.classList.remove('hidden');
-                } else {
-                    alert(data.erro || "Erro ao gerar notas.");
-                }
-
-            } catch (err) {
-                alert("Erro ao conectar com o servidor.");
-            } finally {
-                // Finaliza o carregamento
-                loadingBox.classList.add('hidden');
-                btnGerar.disabled = false;
-                btnGerar.innerText = "⚡ Gerar Notas de Venda";
-            }
-        }
-
-        function copiar(id) {
-            const texto = document.getElementById(id).innerText;
-            navigator.clipboard.writeText(texto);
-            alert("Nota copiada com sucesso!");
-        }
-    </script>
-</body>
-</html>
+    if (data.sucesso) {
+      player.src = data.audioUrl;
+      downloadLink.href = data.audioUrl;
+      
+      // Esconde o botão gerar e mostra o player + botão de baixar
+      btn.style.display = 'none';
+      container.style.display = 'block';
+    } else {
+      alert(data.erro || 'Erro ao gerar áudio.');
+      btn.innerText = '🎙️ Tentar Novamente';
+    }
+  } catch (err) {
+    alert('Erro de conexão com o servidor de áudio.');
+    btn.innerText = '🎙️ Tentar Novamente';
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+}
+</script>
