@@ -17,35 +17,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ erro: 'Informe o produto e a oferta.' });
     }
 
-    // 1. DESCOBERTA AUTOMÁTICA: Pergunta ao Google quais modelos esta chave pode usar
-    const listModelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-    const listRes = await fetch(listModelsUrl);
-    
-    if (!listRes.ok) {
-      const listErr = await listRes.text();
-      return res.status(500).json({
-        erro: `Chave recusada pelo Google. Verifique se a chave na Vercel está correta. Detalhes: ${listErr}`
-      });
-    }
-
-    const listData = await listRes.json();
-    const availableModels = listData.models || [];
-
-    // Filtra modelos que suportam geração de texto
-    const validModels = availableModels.filter(m => 
-      m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')
-    );
-
-    if (validModels.length === 0) {
-      return res.status(500).json({ erro: 'Nenhum modelo de texto disponível para esta chave.' });
-    }
-
-    // Seleciona o melhor modelo disponível para a chave
-    let chosenModel = validModels.find(m => m.name.includes('gemini-2.5-flash')) ||
-                      validModels.find(m => m.name.includes('gemini-2.0-flash')) ||
-                      validModels.find(m => m.name.includes('gemini-1.5-flash')) ||
-                      validModels[0];
-
     const promptText = `Atue como o "Note CupomClic", o gerador de textos de vendas de alta conversão do ecossistema Tokto-CupomClic.
     
 Produto: ${produto}
@@ -59,26 +30,52 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
   "live": "Roteiro dinâmico de 30 segundos em 1ª pessoa para a Influencer falar ao vivo na Live Commerce com muita energia"
 }`;
 
-    // 2. Executa a geração usando o modelo descoberto dinamicamente
-    const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${chosenModel.name}:generateContent?key=${apiKey}`;
+    // Lista ordenada de modelos estáveis universais
+    const candidateModels = [
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro'
+    ];
 
-    const genRes = await fetch(generateUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: { 
-          responseMimeType: "application/json" 
+    let responseData = null;
+    let successfulModel = '';
+    let lastError = '';
+
+    // Testa cada modelo. Se um der 403 ou 404, pula automaticamente para o próximo!
+    for (const model of candidateModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        
+        const resApi = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: { 
+              responseMimeType: "application/json" 
+            }
+          })
+        });
+
+        if (resApi.ok) {
+          responseData = await resApi.json();
+          successfulModel = model;
+          break; // Sucesso absoluto! Sai do loop.
+        } else {
+          const errBody = await resApi.text();
+          lastError = `[${model}]: ${errBody}`;
         }
-      })
-    });
-
-    if (!genRes.ok) {
-      const genErr = await genRes.text();
-      return res.status(500).json({ erro: `Erro ao gerar conteúdo (${chosenModel.name}): ${genErr}` });
+      } catch (err) {
+        lastError = `[${model}]: ${err.message}`;
+      }
     }
 
-    const responseData = await genRes.json();
+    if (!responseData) {
+      return res.status(500).json({
+        erro: `Falha ao conectar com o Gemini. Detalhes: ${lastError}`
+      });
+    }
+
     let rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
 
@@ -86,7 +83,7 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
 
     return res.status(200).json({
       sucesso: true,
-      modelo: chosenModel.name,
+      modelo: successfulModel,
       notas: jsonResult
     });
 
