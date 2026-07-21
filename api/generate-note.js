@@ -5,11 +5,14 @@ export default async function handler(req, res) {
 
   try {
     const { produto, oferta, estilo } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       return res.status(500).json({ erro: 'A chave GEMINI_API_KEY não foi configurada na Vercel.' });
     }
+
+    // Limpa espaços ou quebras de linha acidentais
+    apiKey = apiKey.trim();
 
     if (!produto || !oferta) {
       return res.status(400).json({ erro: 'Informe o produto e a oferta.' });
@@ -28,8 +31,8 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
   "live": "Roteiro dinâmico de 30 segundos em 1ª pessoa para a Influencer falar ao vivo na Live Commerce com muita energia"
 }`;
 
-    // Lista de modelos atualizados do Gemini (versões 2.5 e 2.0)
-    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    // Lista de modelos oficiais ativos
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
     let responseData = null;
     let lastError = '';
 
@@ -50,24 +53,23 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
 
         if (resApi.ok) {
           responseData = await resApi.json();
-          break; // Conexão realizada com sucesso!
+          break;
         } else {
           const errBody = await resApi.text();
-          lastError = `[Model ${model}]: ${errBody}`;
+          lastError = errBody;
         }
       } catch (err) {
-        lastError = `[Model ${model}]: ${err.message}`;
+        lastError = err.message;
       }
     }
 
     if (!responseData) {
-      return res.status(500).json({ erro: `Falha ao conectar com o Gemini. Detalhes: ${lastError}` });
+      return res.status(500).json({ 
+        erro: `Falha ao acessar o Gemini. Verifique a chave GEMINI_API_KEY na Vercel. Detalhes: ${lastError}` 
+      });
     }
 
-    // Extrai o texto retornado
     let rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Sanitiza o texto removendo marcadores de código caso o Gemini devolva ```json
     rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
 
     const jsonResult = JSON.parse(rawText);
@@ -79,6 +81,6 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
 
   } catch (erro) {
     console.error("Erro interno:", erro);
-    return res.status(500).json({ erro: `Erro ao processar a geração no servidor: ${erro.message}` });
+    return res.status(500).json({ erro: `Erro ao processar no servidor: ${erro.message}` });
   }
 }
