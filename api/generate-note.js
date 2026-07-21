@@ -28,18 +28,41 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
   "live": "Roteiro dinâmico de 30 segundos em 1ª pessoa para a Influencer falar ao vivo na Live Commerce com muita energia"
 }`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: { response_mime_type: "application/json" }
-      })
-    });
+    // Lista de modelos atualizados do Gemini para garantir compatibilidade 100%
+    const endpoints = [
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+    ];
 
-    if (!response.ok) {
-      const errText = await response.text();
-      return res.status(500).json({ erro: `Erro no Gemini: ${errText}` });
+    let response = null;
+    let lastErrorText = '';
+
+    // Testa os endpoints até encontrar o modelo ativo no projeto do Google
+    for (const url of endpoints) {
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: { response_mime_type: "application/json" }
+          })
+        });
+
+        if (response.ok) {
+          break; // Conexão bem-sucedida!
+        } else {
+          lastErrorText = await response.text();
+        }
+      } catch (e) {
+        lastErrorText = e.message;
+      }
+    }
+
+    if (!response || !response.ok) {
+      return res.status(500).json({ erro: `Erro no Gemini: ${lastErrorText}` });
     }
 
     const data = await response.json();
