@@ -4,64 +4,49 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { produto, oferta, estilo } = req.body;
-    let apiKey = process.env.GROQ_API_KEY;
+    const { texto } = req.body;
+    let apiKey = process.env.FAL_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ erro: 'A chave GROQ_API_KEY não foi configurada na Vercel.' });
+      return res.status(500).json({ erro: 'A chave FAL_KEY não foi configurada na Vercel.' });
     }
 
-    apiKey = apiKey.trim();
-
-    if (!produto || !oferta) {
-      return res.status(400).json({ erro: 'Informe o produto e a oferta.' });
+    if (!texto) {
+      return res.status(400).json({ erro: 'Informe o texto para geração do áudio.' });
     }
 
-    const promptText = `Atue como o "Note CupomClic", o gerador de textos de vendas de alta conversão do ecossistema Tokto-CupomClic.
-    
-Produto: ${produto}
-Oferta/Preço: ${oferta}
-Tom de Voz/Estilo: ${estilo || 'Botini Agressivo (Vendas e Urgência)'}
-
-Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON válido com as seguintes chaves e formatos exatos:
-{
-  "instagram": "Legenda para Instagram com emojis, oferta clara, gatilho de escassez e hashtags locais da cidade",
-  "whatsapp": "Texto formatado para disparo de WhatsApp usando *negrito* nos destaques, direto e fácil de ler",
-  "live": "Roteiro dinâmico de 30 segundos em 1ª pessoa para a Influencer falar ao vivo na Live Commerce com muita energia"
-}`;
-
-    const resApi = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    // Chamada para a API do ElevenLabs (v3 Multilíngue) hospedada no Fal.ai
+    const response = await fetch('https://fal.run/fal-ai/elevenlabs/tts/eleven-v3', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Key ${apiKey.trim()}`, // O Fal.ai exige o prefixo "Key "
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: 'Você é um assistente de copywriting persuasivo que responde estritamente em formato JSON.' },
-          { role: 'user', content: promptText }
-        ],
-        response_format: { type: 'json_object' }
+        text: texto,
+        voice: "Charlie" // Charlie tem um tom muito bom e natural para vendas (PT-BR)
       })
     });
 
-    if (!resApi.ok) {
-      const errBody = await resApi.text();
-      return res.status(500).json({ erro: `Erro na Groq API: ${errBody}` });
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(500).json({ erro: `Erro no Fal.ai: ${errText}` });
     }
 
-    const responseData = await resApi.json();
-    const rawText = responseData.choices[0].message.content;
-    const jsonResult = JSON.parse(rawText);
+    const data = await response.json();
+
+    // O Fal retorna um objeto que contém a URL do áudio pronto (data.audio.url)
+    if (!data.audio || !data.audio.url) {
+      return res.status(500).json({ erro: 'O Fal não retornou o link do áudio.' });
+    }
 
     return res.status(200).json({
       sucesso: true,
-      notas: jsonResult
+      audioUrl: data.audio.url
     });
 
   } catch (erro) {
-    console.error("Erro interno:", erro);
+    console.error("Erro na geração de áudio:", erro);
     return res.status(500).json({ erro: `Erro no servidor: ${erro.message}` });
   }
 }
