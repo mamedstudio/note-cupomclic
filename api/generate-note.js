@@ -4,49 +4,64 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Garante a leitura correta do corpo da requisição
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const texto = body?.texto || body?.text;
-    let apiKey = process.env.FAL_KEY;
+    const { produto, oferta, estilo } = req.body;
+    let apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ erro: 'A chave FAL_KEY não foi configurada na Vercel.' });
+      return res.status(500).json({ erro: 'A chave GROQ_API_KEY não foi configurada na Vercel.' });
     }
 
-    if (!texto || !texto.trim()) {
-      return res.status(400).json({ erro: 'Gere as notas de venda antes de criar o áudio.' });
+    apiKey = apiKey.trim();
+
+    if (!produto || !oferta) {
+      return res.status(400).json({ erro: 'Informe o produto e a oferta.' });
     }
 
-    // Chamada para a API Kokoro TTS hospedada no Fal.ai (Super rápida e excelente qualidade)
-    const response = await fetch('https://fal.run/fal-ai/kokoro', {
+    const promptText = `Atue como o "Note CupomClic", o gerador de textos de vendas de alta conversão do ecossistema Tokto-CupomClic.
+    
+Produto: ${produto}
+Oferta/Preço: ${oferta}
+Tom de Voz/Estilo: ${estilo || 'Botini Agressivo (Vendas e Urgência)'}
+
+Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON válido com as seguintes chaves e formatos exatos:
+{
+  "instagram": "Legenda para Instagram com emojis, oferta clara, gatilho de escassez e hashtags locais da cidade",
+  "whatsapp": "Texto formatado para disparo de WhatsApp usando *negrito* nos destaques, direto e fácil de ler",
+  "live": "Roteiro dinâmico de 30 segundos em 1ª pessoa para a Influencer falar ao vivo na Live Commerce com muita energia"
+}`;
+
+    const resApi = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Key ${apiKey.trim()}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        prompt: texto.trim()
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: 'Você é um assistente de copywriting persuasivo que responde estritamente em formato JSON.' },
+          { role: 'user', content: promptText }
+        ],
+        response_format: { type: 'json_object' }
       })
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      return res.status(500).json({ erro: `Erro no Fal.ai: ${errText}` });
+    if (!resApi.ok) {
+      const errBody = await resApi.text();
+      return res.status(500).json({ erro: `Erro na Groq API: ${errBody}` });
     }
 
-    const data = await response.json();
-
-    if (!data.audio || !data.audio.url) {
-      return res.status(500).json({ erro: 'O Fal.ai não retornou o link do áudio.' });
-    }
+    const responseData = await resApi.json();
+    const rawText = responseData.choices[0].message.content;
+    const jsonResult = JSON.parse(rawText);
 
     return res.status(200).json({
       sucesso: true,
-      audioUrl: data.audio.url
+      notas: jsonResult
     });
 
   } catch (erro) {
-    console.error("Erro na geração de áudio:", erro);
+    console.error("Erro interno:", erro);
     return res.status(500).json({ erro: `Erro no servidor: ${erro.message}` });
   }
 }
