@@ -5,10 +5,10 @@ export default async function handler(req, res) {
 
   try {
     const { produto, oferta, estilo } = req.body;
-    let apiKey = process.env.GEMINI_API_KEY;
+    let apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ erro: 'A chave GEMINI_API_KEY não foi configurada na Vercel.' });
+      return res.status(500).json({ erro: 'A chave GROQ_API_KEY não foi configurada na Vercel.' });
     }
 
     apiKey = apiKey.trim();
@@ -30,60 +30,33 @@ Gere 3 textos incrivelmente persuasivos. Retorne ESTRITAMENTE um objeto JSON vá
   "live": "Roteiro dinâmico de 30 segundos em 1ª pessoa para a Influencer falar ao vivo na Live Commerce com muita energia"
 }`;
 
-    // Lista ordenada de modelos estáveis universais
-    const candidateModels = [
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-pro'
-    ];
+    const resApi = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: 'Você é um assistente de copywriting persuasivo que responde estritamente em formato JSON.' },
+          { role: 'user', content: promptText }
+        ],
+        response_format: { type: 'json_object' }
+      })
+    });
 
-    let responseData = null;
-    let successfulModel = '';
-    let lastError = '';
-
-    // Testa cada modelo. Se um der 403 ou 404, pula automaticamente para o próximo!
-    for (const model of candidateModels) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        
-        const resApi = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: { 
-              responseMimeType: "application/json" 
-            }
-          })
-        });
-
-        if (resApi.ok) {
-          responseData = await resApi.json();
-          successfulModel = model;
-          break; // Sucesso absoluto! Sai do loop.
-        } else {
-          const errBody = await resApi.text();
-          lastError = `[${model}]: ${errBody}`;
-        }
-      } catch (err) {
-        lastError = `[${model}]: ${err.message}`;
-      }
+    if (!resApi.ok) {
+      const errBody = await resApi.text();
+      return res.status(500).json({ erro: `Erro na Groq API: ${errBody}` });
     }
 
-    if (!responseData) {
-      return res.status(500).json({
-        erro: `Falha ao conectar com o Gemini. Detalhes: ${lastError}`
-      });
-    }
-
-    let rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-
+    const responseData = await resApi.json();
+    const rawText = responseData.choices[0].message.content;
     const jsonResult = JSON.parse(rawText);
 
     return res.status(200).json({
       sucesso: true,
-      modelo: successfulModel,
       notas: jsonResult
     });
 
